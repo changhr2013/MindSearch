@@ -71,6 +71,8 @@ async def run(request: GenerationParams):
             def sync_generator_wrapper():
                 try:
                     for response in agent.stream_chat(inputs):
+                        if stop_event.is_set():
+                            break
                         queue.sync_q.put(response)
                 except Exception as e:
                     logging.exception(
@@ -93,6 +95,7 @@ async def run(request: GenerationParams):
                         break
                 stop_event.set()  # Inform sync_generator_wrapper to stop
 
+            final_response = None
             async for response in async_generator_wrapper():
                 if isinstance(response, tuple):
                     agent_return, node_name = response
@@ -110,25 +113,29 @@ async def run(request: GenerationParams):
                 response_json = json.dumps(dict(response=agent_return,
                                                 current_node=node_name),
                                            ensure_ascii=False)
-                yield {'data': response_json}
-                # yield f'data: {response_json}\n\n'
+                response_dict = json.loads(response_json)
+                if response_dict['response']['state'] == 0:
+                    final_response = response_dict
+                    break
+                final_response = response_dict
+
+            return final_response
         except Exception as exc:
             msg = 'An error occurred while generating the response.'
             logging.exception(msg)
             response_json = json.dumps(
                 dict(error=dict(msg=msg, details=str(exc))),
                 ensure_ascii=False)
-            yield {'data': response_json}
-            # yield f'data: {response_json}\n\n'
+            return {'error': response_json}
         finally:
-            await stop_event.wait(
-            )  # Waiting for async_generator_wrapper to stop
+            stop_event.set()  # Ensure the stop_event is set
+            await stop_event.wait()  # Waiting for async_generator_wrapper to stop
             queue.close()
             await queue.wait_closed()
 
     inputs = request.inputs
     agent = init_agent(lang=args.lang, model_format=args.model_format,search_engine=args.search_engine)
-    return EventSourceResponse(generate())
+    return await generate()
 
 
 if __name__ == '__main__':
