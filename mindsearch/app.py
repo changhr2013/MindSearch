@@ -73,8 +73,6 @@ async def run(request: GenerationParams):
             def sync_generator_wrapper():
                 try:
                     for response in agent.stream_chat(inputs):
-                        if stop_event.is_set():
-                            break
                         queue.sync_q.put(response)
                 except Exception as e:
                     logging.exception(
