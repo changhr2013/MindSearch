@@ -27,6 +27,8 @@ def parse_arguments():
                        default='DuckDuckGoSearch',
                        type=str,
                        help='Search engine')
+    parser.add_argument('--ssl_keyfile', type=str, help='Path to the SSL key file')
+    parser.add_argument('--ssl_certfile', type=str, help='Path to the SSL certificate file')
     return parser.parse_args()
 
 
@@ -140,4 +142,6 @@ async def run(request: GenerationParams):
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=8002, log_level='info')
+    uvicorn.run(app, host='0.0.0.0', port=3003, log_level='info', ssl_keyfile=args.ssl_keyfile,
+                ssl_certfile=args.ssl_certfile)
+    # uvicorn.run(app, host='0.0.0.0', port=8002, log_level='info')
